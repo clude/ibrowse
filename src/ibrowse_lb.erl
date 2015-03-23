@@ -123,24 +123,44 @@ handle_call(stop, _From, #state{ets_tid = Tid} = State) ->
 handle_call(_, _From, #state{proc_state = shutting_down} = State) ->
     {reply, {error, shutting_down}, State};
 
-%% Update max_sessions in #state with supplied value
-handle_call({spawn_connection, _Url, Max_sess, Max_pipe, _, _}, _From,
-	    #state{num_cur_sessions = Num} = State)
-    when Num >= Max_sess ->
-    State_1 = maybe_create_ets(State),
-    Reply = find_best_connection(State_1#state.ets_tid, Max_pipe),
-    {reply, Reply, State_1#state{max_sessions = Max_sess,
-                                 max_pipeline_size = Max_pipe}};
+%% %% Update max_sessions in #state with supplied value
+%% handle_call({spawn_connection, _Url, Max_sess, Max_pipe, _, _}, _From,
+%% 	    #state{num_cur_sessions = Num} = State)
+%%     when Num >= Max_sess ->
+%%     State_1 = maybe_create_ets(State),
+%%     Reply = find_best_connection(State_1#state.ets_tid, Max_pipe),
+%%     {reply, Reply, State_1#state{max_sessions = Max_sess,
+%%                                  max_pipeline_size = Max_pipe}};
+%%
+%% handle_call({spawn_connection, Url, Max_sess, Max_pipe, SSL_options, Process_options}, _From,
+%% 	    #state{num_cur_sessions = Cur} = State) ->
+%%     State_1 = maybe_create_ets(State),
+%%     Tid = State_1#state.ets_tid,
+%%     {ok, Pid} = ibrowse_http_client:start_link({Tid, Url, SSL_options}, Process_options),
+%%     ets:insert(Tid, {Pid, 0, 0}),
+%%     {reply, {ok, Pid}, State_1#state{num_cur_sessions = Cur + 1,
+%%                                      max_sessions = Max_sess,
+%%                                      max_pipeline_size = Max_pipe}};
 
 handle_call({spawn_connection, Url, Max_sess, Max_pipe, SSL_options, Process_options}, _From,
-	    #state{num_cur_sessions = Cur} = State) ->
+    #state{num_cur_sessions = Cur} = State) ->
     State_1 = maybe_create_ets(State),
     Tid = State_1#state.ets_tid,
-    {ok, Pid} = ibrowse_http_client:start_link({Tid, Url, SSL_options}, Process_options),
-    ets:insert(Tid, {Pid, 0, 0}),
-    {reply, {ok, Pid}, State_1#state{num_cur_sessions = Cur + 1,
-                                     max_sessions = Max_sess,
-                                     max_pipeline_size = Max_pipe}};
+    Rst = find_best_connection(Tid, Max_pipe),
+    {Reply, NewSessionCounts} = case Rst of
+                                    {error, retry_later} ->
+                                        case Cur >= Max_sess of
+                                            true -> { {error, retry_later}, Cur};
+                                            _ -> {ok, Pid} = ibrowse_http_client:start_link({Tid, Url, SSL_options}, Process_options),
+                                                ets:insert(Tid, {Pid, 0, 0}),
+                                                { {ok, Pid}, Cur + 1 }
+                                        end;
+                                    FindResult -> { FindResult, Cur}  %{{ok, Pid}, CurrentSessions}
+                                end,
+
+    {reply, Reply, State_1#state{num_cur_sessions = NewSessionCounts,
+        max_sessions = Max_sess,
+        max_pipeline_size = Max_pipe}};
 
 handle_call(Request, _From, State) ->
     Reply = {unknown_request, Request},
