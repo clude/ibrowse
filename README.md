@@ -1,5 +1,17 @@
 # ibrowse [![Build Status](https://secure.travis-ci.org/johannesh/ibrowse.png)](http://travis-ci.org/johannesh/ibrowse)
 
+Note: this porject is forked from cmullaparthi/ibrowse, and used for real time bidding project.
+
+If most of the HTTP requests are using POST methods, and you need high performance, this project may be helpful for you.
+below is the setting you need to pay attention.
+
+```
+`max_sessions`: 50 ~ 300+ (values can be set based your site QPS)
+
+`max_pipeline_size`: 1  ( keeps it as 1, you should not change it to any other value)
+```
+
+
 ibrowse is a HTTP client written in erlang.
 
 **License:** ibrowse is available under two different licenses.
