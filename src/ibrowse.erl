@@ -112,7 +112,7 @@
                       get_value/3,
                       do_trace/2
                      ]).
-                      
+
 -record(state, {trace = false}).
 
 -include("ibrowse.hrl").
@@ -120,6 +120,7 @@
 
 -define(DEF_MAX_SESSIONS,10).
 -define(DEF_MAX_PIPELINE_SIZE,10).
+-define(DEF_TRY_COUNT,1).
 
 %%====================================================================
 %% External functions
@@ -165,7 +166,7 @@ stop() ->
 send_req(Url, Headers, Method) ->
     send_req(Url, Headers, Method, [], []).
 
-%% @doc Same as send_req/3. 
+%% @doc Same as send_req/3.
 %% If a list is specified for the body it has to be a flat list. The body can also be a fun/0 or a fun/1. <br/>
 %% If fun/0, the connection handling process will repeatdely call the fun until it returns an error or eof. <pre>Fun() = {ok, Data} | eof</pre><br/>
 %% If fun/1, the connection handling process will repeatedly call the fun with the supplied state until it returns an error or eof. <pre>Fun(State) = {ok, Data} | {ok, Data, NewState} | eof</pre>
@@ -198,7 +199,7 @@ send_req(Url, Headers, Method, Body) ->
 %% will have to invoke <code>ibrowse:stream_next(Request_id)</code> to
 %% receive the next packet.</li>
 %%
-%% <li>When both the options <code>save_response_to_file</code> and <code>stream_to</code> 
+%% <li>When both the options <code>save_response_to_file</code> and <code>stream_to</code>
 %% are specified, the former takes precedence.</li>
 %%
 %% <li>For the <code>save_response_to_file</code> option, the response body is saved to
@@ -213,8 +214,8 @@ send_req(Url, Headers, Method, Body) ->
 %% cases, it might be hard to estimate how long a request will take to
 %% complete. In such cases, the client might want to timeout if no
 %% data has been received on the link for a certain time interval.
-%% 
-%% This value is also used to close connections which are not in use for 
+%%
+%% This value is also used to close connections which are not in use for
 %% the specified timeout value.
 %% </li>
 %%
@@ -232,15 +233,15 @@ send_req(Url, Headers, Method, Body) ->
 %% ibrowse:send_req("http://www.example.com/cgi-bin/request", [], get, [], [{connect_timeout, 100}], 1000).
 %% </code>
 %% In the above invocation, if the connection isn't established within
-%% 100 milliseconds, the request will fail with 
+%% 100 milliseconds, the request will fail with
 %% <code>{error, conn_failed}</code>.<br/>
 %% If connection setup succeeds, the total time allowed for the
 %% request to complete will be 1000 milliseconds minus the time taken
 %% for connection setup.
 %% </li>
-%% 
+%%
 %% <li> The <code>socket_options</code> option can be used to set
-%% specific options on the socket. The <code>{active, true | false | once}</code> 
+%% specific options on the socket. The <code>{active, true | false | once}</code>
 %% and <code>{packet_type, Packet_type}</code> will be filtered out by ibrowse.  </li>
 %%
 %% <li> The <code>headers_as_is</code> option is to enable the caller
@@ -256,7 +257,7 @@ send_req(Url, Headers, Method, Body) ->
 %% to receive the raw data stream when the Transfer-Encoding of the server
 %% response is Chunked.
 %% </li>
-%% <li> The <code>return_raw_request</code> option enables the caller to get the exact request which was sent by ibrowse to the server, along with the response. When this option is used, the response for synchronous requests is a 5-tuple instead of the usual 4-tuple. For asynchronous requests, the calling process gets a message <code>{ibrowse_async_raw_req, Raw_req}</code>. 
+%% <li> The <code>return_raw_request</code> option enables the caller to get the exact request which was sent by ibrowse to the server, along with the response. When this option is used, the response for synchronous requests is a 5-tuple instead of the usual 4-tuple. For asynchronous requests, the calling process gets a message <code>{ibrowse_async_raw_req, Raw_req}</code>.
 %% </li>
 %% </ul>
 %%
@@ -266,7 +267,7 @@ send_req(Url, Headers, Method, Body) ->
 %%          {response_format,response_format()}|
 %%          {stream_chunk_size, integer()}     |
 %%          {max_pipeline_size, integer()}     |
-%%          {trace, boolean()}                 | 
+%%          {trace, boolean()}                 |
 %%          {is_ssl, boolean()}                |
 %%          {ssl_options, [SSLOpt]}            |
 %%          {pool_name, atom()}                |
@@ -286,7 +287,7 @@ send_req(Url, Headers, Method, Body) ->
 %%          {inactivity_timeout, integer()}    |
 %%          {connect_timeout, integer()}       |
 %%          {socket_options, Sock_opts}        |
-%%          {transfer_encoding, {chunked, ChunkSize}} | 
+%%          {transfer_encoding, {chunked, ChunkSize}} |
 %%          {headers_as_is, boolean()}         |
 %%          {give_raw_headers, boolean()}      |
 %%          {preserve_chunked_encoding,boolean()}     |
@@ -308,7 +309,7 @@ send_req(Url, Headers, Method, Body) ->
 send_req(Url, Headers, Method, Body, Options) ->
     send_req(Url, Headers, Method, Body, Options, 30000).
 
-%% @doc Same as send_req/5. 
+%% @doc Same as send_req/5.
 %% All timeout values are in milliseconds.
 %% @spec send_req(Url, Headers::headerList(), Method::method(), Body::body(), Options::optionList(), Timeout) -> response()
 %% Timeout = integer() | infinity
@@ -333,22 +334,22 @@ send_req(Url, Headers, Method, Body, Options, Timeout) ->
                     true -> {get_value(ssl_options, Options_1, []), true}
                 end,
             try_routing_request(Lb_pid, Parsed_url,
-                                Max_sessions, 
+                                Max_sessions,
                                 Max_pipeline_size,
-                                {SSLOptions, IsSSL}, 
+                                {SSLOptions, IsSSL},
                                 Headers, Method, Body, Options_1, Timeout, 0);
         Err ->
             {error, {url_parsing_failed, Err}}
     end.
 
 try_routing_request(Lb_pid, Parsed_url,
-                    Max_sessions, 
+                    Max_sessions,
                     Max_pipeline_size,
-                    {SSLOptions, IsSSL}, 
-                    Headers, Method, Body, Options_1, Timeout, Try_count) when Try_count < 3 ->
+                    {SSLOptions, IsSSL},
+                    Headers, Method, Body, Options_1, Timeout, Try_count) when Try_count < ?DEF_TRY_COUNT ->
     ProcessOptions = get_value(worker_process_options, Options_1, []),
     case ibrowse_lb:spawn_connection(Lb_pid, Parsed_url,
-                                             Max_sessions, 
+                                             Max_sessions,
                                              Max_pipeline_size,
                                              {SSLOptions, IsSSL},
                                              ProcessOptions) of
@@ -356,11 +357,14 @@ try_routing_request(Lb_pid, Parsed_url,
             case do_send_req(Conn_Pid, Parsed_url, Headers,
                              Method, Body, Options_1, Timeout) of
                 {error, sel_conn_closed} ->
-                    try_routing_request(Lb_pid, Parsed_url,
-                                        Max_sessions, 
-                                        Max_pipeline_size,
-                                        {SSLOptions, IsSSL}, 
-                                        Headers, Method, Body, Options_1, Timeout, Try_count + 1);
+                    case Try_count + 1 < ?DEF_TRY_COUNT of
+                        true -> try_routing_request(Lb_pid, Parsed_url,
+                                                  Max_sessions,
+                                                  Max_pipeline_size,
+                                                  {SSLOptions, IsSSL},
+                                                  Headers, Method, Body, Options_1, Timeout, Try_count + 1);
+                        _ -> {error, sel_conn_closed}
+                    end;
                 Res ->
                     Res
             end;
@@ -425,7 +429,7 @@ set_dest(_Host, _Port, [H | _]) ->
     exit({invalid_option, H});
 set_dest(_, _, []) ->
     ok.
-    
+
 %% @doc Set the maximum number of connections allowed to a specific Host:Port.
 %% @spec set_max_sessions(Host::string(), Port::integer(), Max::integer()) -> ok
 set_max_sessions(Host, Port, Max) when is_integer(Max), Max > 0 ->
@@ -557,7 +561,7 @@ send_req_direct(Conn_pid, Url, Headers, Method, Body, Options, Timeout) ->
 %% caller. Should be used in conjunction with the
 %% <code>stream_to</code> option
 %% @spec stream_next(Req_id :: req_id()) -> ok | {error, unknown_req_id}
-stream_next(Req_id) ->    
+stream_next(Req_id) ->
     case ets:lookup(ibrowse_stream, {req_id_pid, Req_id}) of
         [] ->
             {error, unknown_req_id};
@@ -572,7 +576,7 @@ stream_next(Req_id) ->
 %% the connection which is serving this Req_id will be aborted, and an
 %% error returned.
 %% @spec stream_close(Req_id :: req_id()) -> ok | {error, unknown_req_id}
-stream_close(Req_id) ->    
+stream_close(Req_id) ->
     case ets:lookup(ibrowse_stream, {req_id_pid, Req_id}) of
         [] ->
             {error, unknown_req_id};
@@ -623,11 +627,11 @@ show_dest_status() ->
               io:format("~40.40s | ~-5.5s | ~-5.5s | ~p~n",
                         [Host ++ ":" ++ integer_to_list(Port),
                          integer_to_list(Tid),
-                         integer_to_list(Size), 
+                         integer_to_list(Size),
                          Lb_pid])
       end, Metrics).
 
-show_dest_status(Url) ->                                          
+show_dest_status(Url) ->
     #url{host = Host, port = Port} = ibrowse_lib:parse_url(Url),
     show_dest_status(Host, Port).
 
@@ -646,7 +650,7 @@ show_dest_status(Host, Port) ->
                       "Num Connections       : ~p~n"
                       "Smallest pipeline     : ~p:~p~n"
                       "Largest pipeline      : ~p:~p~n",
-                      [Lb_pid, MsgQueueSize, Tid, Size, 
+                      [Lb_pid, MsgQueueSize, Tid, Size,
                        First_p_sz, First_speculative_sz,
                        Last_p_sz, Last_speculative_sz]);
         _Err ->
@@ -774,7 +778,7 @@ apply_config(Terms) ->
     insert_config(Terms).
 
 insert_config(Terms) ->
-    Fun = fun({dest, Host, Port, MaxSess, MaxPipe, Options}) 
+    Fun = fun({dest, Host, Port, MaxSess, MaxPipe, Options})
              when is_list(Host), is_integer(Port),
                   is_integer(MaxSess), MaxSess > 0,
                   is_integer(MaxPipe), MaxPipe > 0, is_list(Options) ->
@@ -784,7 +788,7 @@ insert_config(Terms) ->
                   lists:foreach(
                     fun({X, Y}) ->
                             ets:insert(ibrowse_conf,
-                                       #ibrowse_conf{key = X, 
+                                       #ibrowse_conf{key = X,
                                                      value = Y})
                     end, I);
              ({K, V}) ->
@@ -902,7 +906,7 @@ handle_info(all_trace_off, State) ->
     ets:foldl(Fun, undefined, ibrowse_lb),
     ets:select_delete(ibrowse_conf, [{{ibrowse_conf,{trace,'$1','$2'},true},[],['true']}]),
     {noreply, State};
-                                  
+
 handle_info({trace, Bool}, State) ->
     put(my_trace_flag, Bool),
     {noreply, State};
@@ -919,7 +923,7 @@ handle_info({trace, Bool, Host, Port}, State) ->
     ets:insert(ibrowse_conf, #ibrowse_conf{key = {trace, Host, Port},
                                            value = Bool}),
     {noreply, State};
-                     
+
 handle_info(_Info, State) ->
     {noreply, State}.
 
