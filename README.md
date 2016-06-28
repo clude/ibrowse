@@ -6,7 +6,7 @@ If most of the HTTP requests are using POST methods, and you need high performan
 below is the setting you need to pay attention.
 
 ```
-`max_sessions`: 50 ~ 300+ (values can be set based your site QPS)
+`max_sessions`: 50 ~ 300+ (values can be set based on your site's QPS)
 
 `max_pipeline_size`: 1  ( keeps it as 1, you should not change it to any other value)
 ```
